@@ -22,14 +22,20 @@ class JinaEmbeddingFunction:
         self._api_key = api_key
 
     def __call__(self, input: List[str]) -> List[List[float]]:
-        with httpx.Client(timeout=60.0) as client:
-            response = client.post(
-                "https://api.jina.ai/v1/embeddings",
-                headers={"Authorization": f"Bearer {self._api_key}"},
-                json={"input": input, "model": "jina-embeddings-v2-base-en"},
-            )
+        import time
+        for attempt in range(3):
+            with httpx.Client(timeout=60.0) as client:
+                response = client.post(
+                    "https://api.jina.ai/v1/embeddings",
+                    headers={"Authorization": f"Bearer {self._api_key}"},
+                    json={"input": input, "model": "jina-embeddings-v2-base-en"},
+                )
+            if response.status_code == 429:
+                time.sleep(2 ** attempt)
+                continue
             response.raise_for_status()
-        return [item["embedding"] for item in response.json()["data"]]
+            return [item["embedding"] for item in response.json()["data"]]
+        response.raise_for_status()
 
 
 chroma_client = chromadb.PersistentClient(path=CHROMA_DIR)

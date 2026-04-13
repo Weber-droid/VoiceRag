@@ -781,12 +781,11 @@
 
         async function handleUpload(file) {
             if (!file.name.endsWith('.pdf')) {
-                showToast('Only PDFs supported', 'error');
+                showToast('Only PDF files are supported', 'error');
                 return;
             }
             showToast('Uploading & ingesting…', 'success');
 
-            // Show progress bar
             const progressContainer = document.getElementById('progressContainer');
             progressContainer.classList.add('show');
 
@@ -794,12 +793,9 @@
             form.append('file', file);
 
             try {
-                const res = await fetch(`${API}/upload`, {
-                    method: 'POST',
-                    body: form
-                });
+                const res = await fetch(`${API}/upload`, { method: 'POST', body: form });
                 const data = await res.json();
-                if (!res.ok) throw new Error(data.detail || 'Upload failed');
+                if (!res.ok) throw { status: res.status, detail: data.detail };
 
                 const chip = document.createElement('div');
                 chip.className = 'file-chip';
@@ -807,11 +803,21 @@
                 fileList.appendChild(chip);
                 showToast(`"${file.name}" ready`, 'success');
             } catch (err) {
-                showToast(err.message, 'error');
+                const msg = uploadErrorMessage(err);
+                showToast(msg, 'error');
             } finally {
-                // Hide progress bar
                 progressContainer.classList.remove('show');
             }
+        }
+
+        function uploadErrorMessage(err) {
+            if (!navigator.onLine) return 'No internet connection.';
+            if (err.status === 413) return 'File too large. Maximum size is 10 MB.';
+            if (err.status === 429) return 'Upload limit reached. Try again in an hour.';
+            if (err.status === 400) return err.detail || 'Invalid file.';
+            if (err.status >= 500) return 'Server error while processing the PDF. Try again.';
+            if (err.detail) return err.detail;
+            return 'Upload failed. Check your connection and try again.';
         }
 
         // ── Recording ──────────────────────────────────────────────────────────
@@ -832,9 +838,7 @@
         async function startRecording() {
             if (isRecording) return;
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    audio: true
-                });
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 audioChunks = [];
                 mediaRecorder = new MediaRecorder(stream);
                 mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
@@ -845,8 +849,12 @@
                 micBtn.textContent = '⏹️';
                 micStatus.textContent = 'Recording… release to send';
                 micStatus.classList.add('active');
-            } catch {
-                showToast('Microphone access denied', 'error');
+            } catch (err) {
+                const msg = err.name === 'NotAllowedError'
+                    ? 'Microphone access denied. Allow it in your browser settings.'
+                    : 'Could not access microphone.';
+                showToast(msg, 'error');
+                renderError(msg);
             }
         }
 
@@ -871,18 +879,15 @@
             setAnswerLoading();
 
             try {
-                const res = await fetch(`${API}/ask/voice`, {
-                    method: 'POST',
-                    body: form
-                });
+                const res = await fetch(`${API}/ask/voice`, { method: 'POST', body: form });
                 if (!res.ok) {
-                    const err = await res.json();
-                    throw new Error(err.detail || 'Request failed');
+                    const data = await res.json().catch(() => ({}));
+                    throw { status: res.status, detail: data.detail };
                 }
 
                 const question = decodeURIComponent(res.headers.get('X-Question') || '');
                 const answerText = decodeURIComponent(res.headers.get('X-Answer') || '');
-                const sources = (res.headers.get('X-Sources') || '').split(',').filter(Boolean);
+                const sources = decodeURIComponent(res.headers.get('X-Sources') || '').split(',').filter(Boolean);
 
                 const audioBlob = await res.blob();
                 const audioUrl = URL.createObjectURL(audioBlob);
@@ -890,10 +895,21 @@
                 renderAnswer(question, answerText, sources, audioUrl);
                 micStatus.textContent = 'Click and hold to record';
             } catch (err) {
-                showToast(err.message, 'error');
+                const msg = voiceErrorMessage(err);
+                showToast(msg, 'error');
                 micStatus.textContent = 'Click and hold to record';
-                document.getElementById('answerArea').innerHTML = `<div class="empty-state" style="color:var(--error)">${err.message}</div>`;
+                renderError(msg);
             }
+        }
+
+        function voiceErrorMessage(err) {
+            if (!navigator.onLine) return 'No internet connection.';
+            if (err.status === 400) return err.detail || 'Could not understand the audio. Try speaking more clearly.';
+            if (err.status === 413) return 'Recording too long. Keep it under 5 MB.';
+            if (err.status === 429) return 'Question limit reached. Try again in an hour.';
+            if (err.status >= 500) return 'Server error. Try again in a moment.';
+            if (err.detail) return err.detail;
+            return 'Something went wrong. Check your connection and try again.';
         }
 
         // ── Render ─────────────────────────────────────────────────────────────
@@ -921,6 +937,14 @@
           </div>
         </div>`;
     }
+
+        function renderError(msg) {
+            document.getElementById('answerArea').innerHTML = `
+          <div class="bubble answer" style="border-color:rgba(248,113,113,0.3)">
+            <div class="label" style="color:var(--error)">Error</div>
+            ${msg}
+          </div>`;
+        }
 
     // ── Toast ──────────────────────────────────────────────────────────────
     function showToast(msg, type = 'success') {

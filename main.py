@@ -4,6 +4,7 @@ import tempfile
 import time
 from collections import defaultdict
 from pathlib import Path
+from urllib.parse import quote
 from fastapi import FastAPI, UploadFile, File, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
@@ -98,9 +99,9 @@ async def ask_voice(request: Request, audio: UploadFile = File(...)):
             audio_path,
             media_type="audio/mpeg",
             headers={
-                "X-Question": question,
-                "X-Answer": answer[:300],
-                "X-Sources": ", ".join(sources[:3]),
+                "X-Question": quote(question),
+                "X-Answer": quote(answer[:300]),
+                "X-Sources": quote(", ".join(sources[:3])),
             },
         )
     finally:
