@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Tuple, List
 
 import chromadb
-from chromadb.utils.embedding_functions import ONNXMiniLM_L6_V2
+from chromadb.utils.embedding_functions import OpenAIEmbeddingFunction
 from pypdf import PdfReader
 from groq import Groq
 
@@ -14,9 +14,13 @@ CHUNK_OVERLAP = 50
 
 groq_client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
 
-# ChromaDB with sentence-transformers embeddings (runs locally, no extra API key)
+# ChromaDB with Groq-hosted embeddings (free, no ONNX model loaded in memory)
 chroma_client = chromadb.PersistentClient(path=CHROMA_DIR)
-embedding_fn = ONNXMiniLM_L6_V2()
+embedding_fn = OpenAIEmbeddingFunction(
+    api_key=os.environ.get("GROQ_API_KEY"),
+    api_base="https://api.groq.com/openai/v1",
+    model_name="nomic-embed-text-v1.5",
+)
 collection = chroma_client.get_or_create_collection(
     name=COLLECTION_NAME,
     embedding_function=embedding_fn,
