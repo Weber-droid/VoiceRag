@@ -1,39 +1,21 @@
 import os
-import httpx
 from pathlib import Path
 from typing import Tuple, List
 
 import chromadb
+from chromadb.utils.embedding_functions import ONNXMiniLM_L6_V2
 from pypdf import PdfReader
 from groq import Groq
 
 CHROMA_DIR = "chroma_db"
 COLLECTION_NAME = "voice_rag_docs"
-CHUNK_SIZE = 500
-CHUNK_OVERLAP = 50
+CHUNK_SIZE = 1500
+CHUNK_OVERLAP = 150
 
 groq_client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
 
-
-class GroqEmbeddingFunction:
-    """Calls Groq's embedding API directly, no openai SDK needed."""
-
-    def __init__(self, api_key: str):
-        self._api_key = api_key
-
-    def __call__(self, input: List[str]) -> List[List[float]]:
-        with httpx.Client(timeout=60.0) as client:
-            response = client.post(
-                "https://api.groq.com/openai/v1/embeddings",
-                headers={"Authorization": f"Bearer {self._api_key}"},
-                json={"input": input, "model": "nomic-embed-text-v1.5"},
-            )
-            response.raise_for_status()
-        return [item["embedding"] for item in response.json()["data"]]
-
-
 chroma_client = chromadb.PersistentClient(path=CHROMA_DIR)
-embedding_fn = GroqEmbeddingFunction(api_key=os.environ.get("GROQ_API_KEY"))
+embedding_fn = ONNXMiniLM_L6_V2()
 collection = chroma_client.get_or_create_collection(
     name=COLLECTION_NAME,
     embedding_function=embedding_fn,
