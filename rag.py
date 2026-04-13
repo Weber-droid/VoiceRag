@@ -1,9 +1,9 @@
 import os
+import httpx
 from pathlib import Path
 from typing import Tuple, List
 
 import chromadb
-from chromadb.utils.embedding_functions import ONNXMiniLM_L6_V2
 from pypdf import PdfReader
 from groq import Groq
 
@@ -14,8 +14,26 @@ CHUNK_OVERLAP = 150
 
 groq_client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
 
+
+class JinaEmbeddingFunction:
+    """Calls Jina AI's embedding API — free tier, no model loaded in memory."""
+
+    def __init__(self, api_key: str):
+        self._api_key = api_key
+
+    def __call__(self, input: List[str]) -> List[List[float]]:
+        with httpx.Client(timeout=60.0) as client:
+            response = client.post(
+                "https://api.jina.ai/v1/embeddings",
+                headers={"Authorization": f"Bearer {self._api_key}"},
+                json={"input": input, "model": "jina-embeddings-v2-base-en"},
+            )
+            response.raise_for_status()
+        return [item["embedding"] for item in response.json()["data"]]
+
+
 chroma_client = chromadb.PersistentClient(path=CHROMA_DIR)
-embedding_fn = ONNXMiniLM_L6_V2()
+embedding_fn = JinaEmbeddingFunction(api_key=os.environ.get("JINA_API_KEY"))
 collection = chroma_client.get_or_create_collection(
     name=COLLECTION_NAME,
     embedding_function=embedding_fn,
