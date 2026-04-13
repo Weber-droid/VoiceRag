@@ -1,9 +1,9 @@
 import os
+import httpx
 from pathlib import Path
 from typing import Tuple, List
 
 import chromadb
-from chromadb.utils.embedding_functions import OpenAIEmbeddingFunction
 from pypdf import PdfReader
 from groq import Groq
 
@@ -14,13 +14,26 @@ CHUNK_OVERLAP = 50
 
 groq_client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
 
-# ChromaDB with Groq-hosted embeddings (free, no ONNX model loaded in memory)
+
+class GroqEmbeddingFunction:
+    """Calls Groq's embedding API directly, no openai SDK needed."""
+
+    def __init__(self, api_key: str):
+        self._api_key = api_key
+
+    def __call__(self, input: List[str]) -> List[List[float]]:
+        with httpx.Client(timeout=60.0) as client:
+            response = client.post(
+                "https://api.groq.com/openai/v1/embeddings",
+                headers={"Authorization": f"Bearer {self._api_key}"},
+                json={"input": input, "model": "nomic-embed-text-v1.5"},
+            )
+            response.raise_for_status()
+        return [item["embedding"] for item in response.json()["data"]]
+
+
 chroma_client = chromadb.PersistentClient(path=CHROMA_DIR)
-embedding_fn = OpenAIEmbeddingFunction(
-    api_key=os.environ.get("GROQ_API_KEY"),
-    api_base="https://api.groq.com/openai/v1",
-    model_name="nomic-embed-text-v1.5",
-)
+embedding_fn = GroqEmbeddingFunction(api_key=os.environ.get("GROQ_API_KEY"))
 collection = chroma_client.get_or_create_collection(
     name=COLLECTION_NAME,
     embedding_function=embedding_fn,
