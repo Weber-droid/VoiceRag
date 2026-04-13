@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>VoiceRAG</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+    <style>
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+         :root {
+            --bg: #0a0a0f;
+            --surface: #111118;
+            --border: #1e1e2e;
+            --accent: #7c6aff;
+            --accent2: #ff6a9b;
+            --text: #e8e8f0;
+            --muted: #5a5a72;
+            --success: #4ade80;
+            --error: #f87171;
+        }
+        
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Syne', sans-serif;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 40px 20px;
+            overflow-x: hidden;
+        }
+        /* Ambient background */
+        
+        body::before {
+            content: '';
+            position: fixed;
+            top: -30%;
+            left: -10%;
+            width: 60vw;
+            height: 60vw;
+            background: radial-gradient(circle, rgba(124, 106, 255, 0.07) 0%, transparent 70%);
+            pointer-events: none;
+            z-index: 0;
+        }
+        
+        body::after {
+            content: '';
+            position: fixed;
+            bottom: -20%;
+            right: -10%;
+            width: 50vw;
+            height: 50vw;
+            background: radial-gradient(circle, rgba(255, 106, 155, 0.05) 0%, transparent 70%);
+            pointer-events: none;
+            z-index: 0;
+        }
+        
+        .container {
+            width: 100%;
+            max-width: 720px;
+            position: relative;
+            z-index: 1;
+        }
+        
+        header {
+            text-align: center;
+            margin-bottom: 48px;
+        }
+        
+        .logo {
+            font-size: 11px;
+            font-family: 'DM Mono', monospace;
+            color: var(--accent);
+            letter-spacing: 0.3em;
+            text-transform: uppercase;
+            margin-bottom: 16px;
+        }
+        
+        h1 {
+            font-size: clamp(2.5rem, 6vw, 4rem);
+            font-weight: 800;
+            line-height: 1;
+            background: linear-gradient(135deg, var(--text) 30%, var(--accent));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .subtitle {
+            margin-top: 12px;
+            color: var(--muted);
+            font-size: 0.95rem;
+            font-weight: 400;
+        }
+        /* Cards */
+        
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 28px;
+            margin-bottom: 20px;
+            transition: border-color 0.2s;
+        }
+        
+        .card:hover {
+            border-color: #2e2e44;
+        }
+        
+        .card-label {
+            font-size: 10px;
+            font-family: 'DM Mono', monospace;
+            letter-spacing: 0.25em;
+            text-transform: uppercase;
+            color: var(--accent);
+            margin-bottom: 14px;
+        }
+        /* Upload zone */
+        
+        .upload-zone {
+            border: 2px dashed var(--border);
+            border-radius: 12px;
+            padding: 36px 24px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+        }
+        
+        .upload-zone:hover,
+        .upload-zone.dragover {
+            border-color: var(--accent);
+            background: rgba(124, 106, 255, 0.05);
+        }
+        
+        .upload-zone input[type="file"] {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            cursor: pointer;
+        }
+        
+        .upload-icon {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+        
+        .upload-zone p {
+            color: var(--muted);
+            font-size: 0.9rem;
+        }
+        
+        .upload-zone span {
+            color: var(--accent);
+            font-weight: 600;
+        }
+        
+        .file-list {
+            margin-top: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .file-chip {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(124, 106, 255, 0.1);
+            border: 1px solid rgba(124, 106, 255, 0.2);
+            border-radius: 8px;
+            padding: 8px 14px;
+            font-size: 0.85rem;
+            font-family: 'DM Mono', monospace;
+        }
+        
+        .file-chip .dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--success);
+            flex-shrink: 0;
+        }
+        
+        .file-chip .chunks {
+            margin-left: auto;
+            color: var(--muted);
+            font-size: 0.75rem;
+        }
+        /* Voice button */
+        
+        .voice-area {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+        
+        .mic-btn {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            border: 2px solid var(--border);
+            background: var(--surface);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.5rem;
+            transition: all 0.2s;
+            position: relative;
+            outline: none;
+        }
+        
+        .mic-btn:hover {
+            border-color: var(--accent);
+            box-shadow: 0 0 30px rgba(124, 106, 255, 0.2);
+        }
+        
+        .mic-btn.recording {
+            border-color: var(--accent2);
+            box-shadow: 0 0 0 0 rgba(255, 106, 155, 0.4);
+            animation: pulse 1.2s ease-out infinite;
+        }
+        
+        @keyframes pulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(255, 106, 155, 0.4);
+            }
+            70% {
+                box-shadow: 0 0 0 20px rgba(255, 106, 155, 0);
+            }
+            100% {
+                box-shadow: 0 0 0 0 rgba(255, 106, 155, 0);
+            }
+        }
+        
+        .mic-status {
+            font-size: 0.85rem;
+            color: var(--muted);
+            font-family: 'DM Mono', monospace;
+            text-align: center;
+        }
+        
+        .mic-status.active {
+            color: var(--accent2);
+        }
+        /* Transcript / answer */
+        
+        .exchange {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        
+        .bubble {
+            padding: 14px 18px;
+            border-radius: 12px;
+            font-size: 0.9rem;
+            line-height: 1.6;
+            max-width: 90%;
+        }
+        
+        .bubble.question {
+            background: rgba(124, 106, 255, 0.12);
+            border: 1px solid rgba(124, 106, 255, 0.2);
+            align-self: flex-end;
+            color: var(--text);
+        }
+        
+        .bubble.answer {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--border);
+            align-self: flex-start;
+        }
+        
+        .bubble .label {
+            font-family: 'DM Mono', monospace;
+            font-size: 0.7rem;
+            letter-spacing: 0.15em;
+            color: var(--muted);
+            margin-bottom: 6px;
+            text-transform: uppercase;
+        }
+        
+        .bubble.question .label {
+            color: var(--accent);
+        }
+        
+        .bubble.answer .label {
+            color: var(--success);
+        }
+        
+        .source-pills {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            margin-top: 10px;
+        }
+        
+        .source-pill {
+            font-size: 0.7rem;
+            font-family: 'DM Mono', monospace;
+            padding: 3px 10px;
+            background: rgba(74, 222, 128, 0.08);
+            border: 1px solid rgba(74, 222, 128, 0.15);
+            border-radius: 20px;
+            color: var(--success);
+        }
+        /* Loading */
+        
+        .loading {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--muted);
+            font-size: 0.85rem;
+            font-family: 'DM Mono', monospace;
+        }
+        
+        .spinner {
+            width: 16px;
+            height: 16px;
+            border: 2px solid var(--border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+        }
+        
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+        /* Toast */
+        
+        .toast {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%) translateY(80px);
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 12px 20px;
+            font-size: 0.85rem;
+            font-family: 'DM Mono', monospace;
+            transition: transform 0.3s ease;
+            z-index: 100;
+            white-space: nowrap;
+        }
+        
+        .toast.show {
+            transform: translateX(-50%) translateY(0);
+        }
+        
+        .toast.success {
+            border-color: rgba(74, 222, 128, 0.3);
+            color: var(--success);
+        }
+        
+        .toast.error {
+            border-color: rgba(248, 113, 113, 0.3);
+            color: var(--error);
+        }
+        /* Audio player */
+        
+        .audio-player {
+            width: 100%;
+            margin-top: 8px;
+            accent-color: var(--accent);
+        }
+        
+        .empty-state {
+            text-align: center;
+            color: var(--muted);
+            font-size: 0.85rem;
+            padding: 20px;
+            font-family: 'DM Mono', monospace;
+        }
+        
+        .badge {
+            display: inline-block;
+            font-size: 0.7rem;
+            font-family: 'DM Mono', monospace;
+            padding: 3px 10px;
+            border-radius: 20px;
+            margin-left: 8px;
+        }
+        
+        .badge.week {
+            background: rgba(124, 106, 255, 0.15);
+            color: var(--accent);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <!-- <div class="logo">AI Engineering Sprint</div> -->
+            <h1>VoiceRAG</h1>
+            <p class="subtitle">Upload a PDF. Ask questions with your voice. Hear the answers.</p>
+        </header>
+
+        <!-- Step 1: Upload -->
+        <div class="card">
+            <div class="card-label">01 — Upload Document</div>
+            <div class="upload-zone" id="uploadZone">
+                <input type="file" id="fileInput" accept=".pdf" />
+                <div class="upload-icon">📄</div>
+                <p><span>Click to upload</span> or drag a PDF here</p>
+            </div>
+            <div class="file-list" id="fileList"></div>
+        </div>
+
+        <!-- Step 2: Ask -->
+        <div class="card">
+            <div class="card-label">02 — Ask a Question</div>
+            <div class="voice-area">
+                <button class="mic-btn" id="micBtn" title="Hold to record">🎙️</button>
+                <div class="mic-status" id="micStatus">Click and hold to record</div>
+            </div>
+        </div>
+
+        <!-- Step 3: Answer -->
+        <div class="card">
+            <div class="card-label">03 — Answer</div>
+            <div id="answerArea">
+                <div class="empty-state">Your Q&A will appear here...</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+        const API = ''; // same origin
+        let mediaRecorder = null;
+        let audioChunks = [];
+        let isRecording = false;
+
+        // ── Upload ──────────────────────────────────────────────────────────────
+        const fileInput = document.getElementById('fileInput');
+        const uploadZone = document.getElementById('uploadZone');
+        const fileList = document.getElementById('fileList');
+
+        uploadZone.addEventListener('dragover', e => {
+            e.preventDefault();
+            uploadZone.classList.add('dragover');
+        });
+        uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragover'));
+        uploadZone.addEventListener('drop', e => {
+            e.preventDefault();
+            uploadZone.classList.remove('dragover');
+            const file = e.dataTransfer.files[0];
+            if (file) handleUpload(file);
+        });
+
+        fileInput.addEventListener('change', () => {
+            if (fileInput.files[0]) handleUpload(fileInput.files[0]);
+        });
+
+        async function handleUpload(file) {
+            if (!file.name.endsWith('.pdf')) {
+                showToast('Only PDFs supported', 'error');
+                return;
+            }
+            showToast('Uploading & ingesting…', 'success');
+
+            const form = new FormData();
+            form.append('file', file);
+
+            try {
+                const res = await fetch(`${API}/upload`, {
+                    method: 'POST',
+                    body: form
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || 'Upload failed');
+
+                const chip = document.createElement('div');
+                chip.className = 'file-chip';
+                chip.innerHTML = `<div class="dot"></div><span>${file.name}</span><span class="chunks">${data.chunks} chunks</span>`;
+                fileList.appendChild(chip);
+                showToast(`"${file.name}" ready`, 'success');
+            } catch (err) {
+                showToast(err.message, 'error');
+            }
+        }
+
+        // ── Recording ──────────────────────────────────────────────────────────
+        const micBtn = document.getElementById('micBtn');
+        const micStatus = document.getElementById('micStatus');
+
+        micBtn.addEventListener('mousedown', startRecording);
+        micBtn.addEventListener('touchstart', e => {
+            e.preventDefault();
+            startRecording();
+        });
+        micBtn.addEventListener('mouseup', stopRecording);
+        micBtn.addEventListener('mouseleave', () => {
+            if (isRecording) stopRecording();
+        });
+        micBtn.addEventListener('touchend', stopRecording);
+
+        async function startRecording() {
+            if (isRecording) return;
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    audio: true
+                });
+                audioChunks = [];
+                mediaRecorder = new MediaRecorder(stream);
+                mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+                mediaRecorder.onstop = sendAudio;
+                mediaRecorder.start();
+                isRecording = true;
+                micBtn.classList.add('recording');
+                micBtn.textContent = '⏹️';
+                micStatus.textContent = 'Recording… release to send';
+                micStatus.classList.add('active');
+            } catch {
+                showToast('Microphone access denied', 'error');
+            }
+        }
+
+        function stopRecording() {
+            if (!isRecording || !mediaRecorder) return;
+            mediaRecorder.stop();
+            mediaRecorder.stream.getTracks().forEach(t => t.stop());
+            isRecording = false;
+            micBtn.classList.remove('recording');
+            micBtn.textContent = '🎙️';
+            micStatus.textContent = 'Processing…';
+            micStatus.classList.remove('active');
+        }
+
+        async function sendAudio() {
+            const blob = new Blob(audioChunks, {
+                type: 'audio/webm'
+            });
+            const form = new FormData();
+            form.append('audio', blob, 'recording.webm');
+
+            setAnswerLoading();
+
+            try {
+                const res = await fetch(`${API}/ask/voice`, {
+                    method: 'POST',
+                    body: form
+                });
+                if (!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.detail || 'Request failed');
+                }
+
+                const question = decodeURIComponent(res.headers.get('X-Question') || '');
+                const answerText = decodeURIComponent(res.headers.get('X-Answer') || '');
+                const sources = (res.headers.get('X-Sources') || '').split(',').filter(Boolean);
+
+                const audioBlob = await res.blob();
+                const audioUrl = URL.createObjectURL(audioBlob);
+
+                renderAnswer(question, answerText, sources, audioUrl);
+                micStatus.textContent = 'Click and hold to record';
+            } catch (err) {
+                showToast(err.message, 'error');
+                micStatus.textContent = 'Click and hold to record';
+                document.getElementById('answerArea').innerHTML = `<div class="empty-state" style="color:var(--error)">${err.message}</div>`;
+            }
+        }
+
+        // ── Render ─────────────────────────────────────────────────────────────
+        function setAnswerLoading() {
+            document.getElementById('answerArea').innerHTML = `
+        <div class="loading">
+          <div class="spinner"></div>
+          <span>Transcribing → retrieving → generating → speaking…</span>
+        </div>`;
+        }
+
+        function renderAnswer(question, answer, sources, audioUrl) {
+            const sourcePills = sources.map(s => `<span class="source-pill">📄 ${s.trim()}</span>`).join('');
+            document.getElementById('answerArea').innerHTML = `
+        <div class="exchange">
+          <div class="bubble question">
+            <div class="label">You asked</div>
+            ${question}
+          </div>
+          <div class="bubble answer">
+            <div class="label">VoiceRAG</div>
+            ${answer}
+            ${sourcePills ? `<div class="source-pills">${sourcePills}</div>` : ''}
+            <audio class="audio-player" controls autoplay src="${audioUrl}"></audio>
+          </div>
+        </div>`;
+    }
+
+    // ── Toast ──────────────────────────────────────────────────────────────
+    function showToast(msg, type = 'success') {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.className = `toast ${type} show`;
+      setTimeout(() => t.classList.remove('show'), 3000);
+    }
+    </script>
+</body>
+
+</html>
